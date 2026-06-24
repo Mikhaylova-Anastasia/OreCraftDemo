@@ -1417,3 +1417,8 @@ Season,,#SEASON_17_NAME,Frost Whisper,Осенние Сумерки,Laternen Nac
 Season,,#SEASON_18_NAME,First Candle,Зимний Порог,Erste Kerze,Primera Vela,Primeira Vela,勤労感謝,초겨울 바람
 Season,,#SEASON_19_NAME,Jingle Frost,Зимний Пир,Nikolaus Tag,Dulce Diciembre,Natal Chegando,師走の風,겨울 설경
 Season,,#SEASON_20_NAME,Silent Night,Дед Мороз,Heilige Nacht,Nochebuena,Noite Consoada,冬至の夜,동지 팥죽
+Profile,,#PROFILE_TITLE,Profile,Профиль,Profil,Perfil,Perfil,プロフィール,프로필
+Profile,,#PROFILE_NICKNAME,Nickname,Никнейм,Spitzname,Apodo,Apelido,ニックネーム,닉네임
+Profile,,#PROFILE_ENTER_NICKNAME,Enter nickname,Введите ник,Spitznamen eingeben,Introduce apodo,Digite o apelido,ニックネームを入力,닉네임 입력
+Profile,,#PROFILE_CHOOSE_AVATAR,Choose avatar,Выберите аватар,Avatar wählen,Elegir avatar,Escolher avatar,アバターを選択,아바타 선택
+Profile,Button,#PROFILE_SAVE,Save,Сохранить,Speichern,Guardar,Salvar,保存,저장
