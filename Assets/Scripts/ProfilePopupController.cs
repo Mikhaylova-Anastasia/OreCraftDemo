@@ -194,4 +194,18 @@ public class ProfilePopupController : MonoBehaviour
 
         return null;
     }
+    public Sprite GetAvatarSpriteByIndex(int avatarIndex)
+    {
+        if (avatarButtons == null || avatarButtons.Length == 0)
+            return null;
+
+        avatarIndex = Mathf.Clamp(avatarIndex, 0, avatarButtons.Length - 1);
+
+        return GetAvatarSpriteFromButton(avatarButtons[avatarIndex]);
+    }
+
+    public Sprite GetSavedAvatarSprite()
+    {
+        return GetAvatarSpriteByIndex(GetSavedAvatarIndex());
+    }
 }
