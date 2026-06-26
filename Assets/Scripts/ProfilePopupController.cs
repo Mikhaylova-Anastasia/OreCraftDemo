@@ -1,4 +1,6 @@
+using System.Collections;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 public class ProfilePopupController : MonoBehaviour
@@ -64,6 +66,8 @@ public class ProfilePopupController : MonoBehaviour
             saveButton.onClick.AddListener(SaveProfile);
         }
 
+        BindNicknameInputEvents();
+
         if (avatarButtons == null)
             return;
 
@@ -78,6 +82,35 @@ public class ProfilePopupController : MonoBehaviour
             button.onClick.RemoveAllListeners();
             button.onClick.AddListener(() => SelectAvatar(avatarIndex));
         }
+    }
+
+    private void BindNicknameInputEvents()
+    {
+        if (nicknameInput == null)
+            return;
+
+        EventTrigger eventTrigger = nicknameInput.GetComponent<EventTrigger>();
+
+        if (eventTrigger == null)
+        {
+            eventTrigger = nicknameInput.gameObject.AddComponent<EventTrigger>();
+        }
+
+        eventTrigger.triggers.Clear();
+
+        AddInputEventTrigger(eventTrigger, EventTriggerType.PointerClick);
+        AddInputEventTrigger(eventTrigger, EventTriggerType.Select);
+    }
+
+    private void AddInputEventTrigger(EventTrigger eventTrigger, EventTriggerType eventType)
+    {
+        EventTrigger.Entry entry = new EventTrigger.Entry
+        {
+            eventID = eventType
+        };
+
+        entry.callback.AddListener(_ => StartCoroutine(SelectNicknameNextFrame()));
+        eventTrigger.triggers.Add(entry);
     }
 
     public void OpenProfilePopup()
@@ -97,6 +130,38 @@ public class ProfilePopupController : MonoBehaviour
         {
             profilePopupRoot.SetActive(visible);
         }
+    }
+
+    private IEnumerator SelectNicknameNextFrame()
+    {
+        yield return null;
+        yield return new WaitForEndOfFrame();
+
+        SelectNicknameText();
+    }
+
+    private void SelectNicknameText()
+    {
+        if (nicknameInput == null)
+            return;
+
+        if (!nicknameInput.gameObject.activeInHierarchy)
+            return;
+
+        if (EventSystem.current != null)
+        {
+            EventSystem.current.SetSelectedGameObject(nicknameInput.gameObject);
+        }
+
+        nicknameInput.ActivateInputField();
+
+        int length = nicknameInput.text.Length;
+
+        nicknameInput.caretPosition = length;
+        nicknameInput.selectionAnchorPosition = 0;
+        nicknameInput.selectionFocusPosition = length;
+
+        nicknameInput.ForceLabelUpdate();
     }
 
     public void SelectAvatar(int avatarIndex)
@@ -172,6 +237,21 @@ public class ProfilePopupController : MonoBehaviour
         }
     }
 
+    public Sprite GetAvatarSpriteByIndex(int avatarIndex)
+    {
+        if (avatarButtons == null || avatarButtons.Length == 0)
+            return null;
+
+        avatarIndex = Mathf.Clamp(avatarIndex, 0, avatarButtons.Length - 1);
+
+        return GetAvatarSpriteFromButton(avatarButtons[avatarIndex]);
+    }
+
+    public Sprite GetSavedAvatarSprite()
+    {
+        return GetAvatarSpriteByIndex(GetSavedAvatarIndex());
+    }
+
     private Sprite GetAvatarSpriteFromButton(Button button)
     {
         if (button == null)
@@ -193,19 +273,5 @@ public class ProfilePopupController : MonoBehaviour
             return fallbackImage.sprite;
 
         return null;
-    }
-    public Sprite GetAvatarSpriteByIndex(int avatarIndex)
-    {
-        if (avatarButtons == null || avatarButtons.Length == 0)
-            return null;
-
-        avatarIndex = Mathf.Clamp(avatarIndex, 0, avatarButtons.Length - 1);
-
-        return GetAvatarSpriteFromButton(avatarButtons[avatarIndex]);
-    }
-
-    public Sprite GetSavedAvatarSprite()
-    {
-        return GetAvatarSpriteByIndex(GetSavedAvatarIndex());
     }
 }
