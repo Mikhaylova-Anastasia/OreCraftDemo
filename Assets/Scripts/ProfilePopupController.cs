@@ -1,7 +1,6 @@
 using System.Collections;
 using TMPro;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 public class ProfilePopupController : MonoBehaviour
@@ -27,14 +26,14 @@ public class ProfilePopupController : MonoBehaviour
 
     private int selectedAvatarIndex;
 
-#if UNITY_ANDROID || UNITY_IOS
-    private TouchScreenKeyboard nicknameKeyboard;
-    private bool isNicknameKeyboardOpen;
-#endif
-
     public static string GetSavedNickname()
     {
-        return PlayerPrefs.GetString(NicknameKey, DefaultNickname);
+        string nickname = PlayerPrefs.GetString(NicknameKey, DefaultNickname);
+
+        if (string.IsNullOrWhiteSpace(nickname))
+            return DefaultNickname;
+
+        return nickname;
     }
 
     public static int GetSavedAvatarIndex()
@@ -47,23 +46,22 @@ public class ProfilePopupController : MonoBehaviour
         ConfigureNicknameInput();
         BindButtons();
 
-        selectedAvatarIndex = GetSavedAvatarIndex();
-
         if (hideOnStart)
         {
             SetPopupVisible(false);
         }
         else
         {
-            StartCoroutine(LoadProfileAfterPopupIsVisible());
+            LoadProfile();
         }
     }
 
-    private void Update()
+    private void OnDestroy()
     {
-#if UNITY_ANDROID || UNITY_IOS
-        UpdateNativeNicknameKeyboard();
-#endif
+        if (nicknameInput != null)
+        {
+            nicknameInput.onSelect.RemoveListener(OnNicknameInputSelected);
+        }
     }
 
     private void ConfigureNicknameInput()
@@ -71,47 +69,26 @@ public class ProfilePopupController : MonoBehaviour
         if (nicknameInput == null)
             return;
 
+#if UNITY_ANDROID || UNITY_IOS
+        TouchScreenKeyboard.hideInput = false;
+#endif
+
         nicknameInput.interactable = true;
+        nicknameInput.readOnly = false;
+
         nicknameInput.contentType = TMP_InputField.ContentType.Standard;
         nicknameInput.lineType = TMP_InputField.LineType.SingleLine;
         nicknameInput.characterLimit = NicknameCharacterLimit;
+
         nicknameInput.shouldHideMobileInput = false;
         nicknameInput.onFocusSelectAll = false;
 
-#if UNITY_ANDROID || UNITY_IOS
-        TouchScreenKeyboard.hideInput = false;
+       
+        nicknameInput.onValidateInput = null;
+        nicknameInput.keyboardType = TouchScreenKeyboardType.Default;
 
-        // На мобилке НЕ даём TMP самому редактировать текст.
-        // Он теперь только отображает ник, а реальный ввод идёт через TouchScreenKeyboard.Open().
-        nicknameInput.readOnly = true;
-
-        BindNativeNicknameClick();
-#else
-        nicknameInput.readOnly = false;
-#endif
-    }
-
-    private void BindNativeNicknameClick()
-    {
-        if (nicknameInput == null)
-            return;
-
-        EventTrigger eventTrigger = nicknameInput.GetComponent<EventTrigger>();
-
-        if (eventTrigger == null)
-        {
-            eventTrigger = nicknameInput.gameObject.AddComponent<EventTrigger>();
-        }
-
-        eventTrigger.triggers.Clear();
-
-        EventTrigger.Entry pointerClickEntry = new EventTrigger.Entry
-        {
-            eventID = EventTriggerType.PointerClick
-        };
-
-        pointerClickEntry.callback.AddListener(_ => OpenNativeNicknameKeyboard());
-        eventTrigger.triggers.Add(pointerClickEntry);
+        nicknameInput.onSelect.RemoveListener(OnNicknameInputSelected);
+        nicknameInput.onSelect.AddListener(OnNicknameInputSelected);
     }
 
     private void BindButtons()
@@ -153,16 +130,16 @@ public class ProfilePopupController : MonoBehaviour
     public void OpenProfilePopup()
     {
         SetPopupVisible(true);
-        StartCoroutine(LoadProfileAfterPopupIsVisible());
+        StartCoroutine(LoadProfileNextFrame());
     }
 
     public void CloseProfilePopup()
     {
-#if UNITY_ANDROID || UNITY_IOS
-        CloseNativeNicknameKeyboard();
-#endif
+        if (nicknameInput != null)
+        {
+            nicknameInput.DeactivateInputField();
+        }
 
-        ReleaseNicknameInputFocus();
         SetPopupVisible(false);
     }
 
@@ -174,100 +151,49 @@ public class ProfilePopupController : MonoBehaviour
         }
     }
 
-    private IEnumerator LoadProfileAfterPopupIsVisible()
+    private IEnumerator LoadProfileNextFrame()
     {
         yield return null;
 
         LoadProfile();
-        ReleaseNicknameInputFocus();
+        MoveNicknameCaretToEnd();
     }
 
-    private void ReleaseNicknameInputFocus()
+    private void OnNicknameInputSelected(string _)
     {
-        if (nicknameInput != null)
-        {
-            nicknameInput.DeactivateInputField();
-        }
-
-        if (EventSystem.current != null &&
-            nicknameInput != null &&
-            EventSystem.current.currentSelectedGameObject == nicknameInput.gameObject)
-        {
-            EventSystem.current.SetSelectedGameObject(null);
-        }
+        StartCoroutine(MoveNicknameCaretToEndNextFrames());
     }
 
-#if UNITY_ANDROID || UNITY_IOS
-    private void OpenNativeNicknameKeyboard()
+    private IEnumerator MoveNicknameCaretToEndNextFrames()
     {
-        if (nicknameInput == null)
-            return;
+        yield return null;
+        MoveNicknameCaretToEnd();
 
-        TouchScreenKeyboard.hideInput = false;
+        yield return new WaitForEndOfFrame();
+        MoveNicknameCaretToEnd();
 
-        string currentNickname = nicknameInput.text;
-
-        if (string.IsNullOrEmpty(currentNickname))
-        {
-            currentNickname = PlayerPrefs.GetString(NicknameKey, "");
-        }
-
-        nicknameKeyboard = TouchScreenKeyboard.Open(
-            currentNickname,
-            TouchScreenKeyboardType.Default,
-            false,
-            false,
-            false,
-            false,
-            "Enter nickname",
-            NicknameCharacterLimit
-        );
-
-        isNicknameKeyboardOpen = true;
+        yield return null;
+        MoveNicknameCaretToEnd();
     }
 
-    private void UpdateNativeNicknameKeyboard()
-    {
-        if (!isNicknameKeyboardOpen || nicknameKeyboard == null)
-            return;
-
-        string keyboardText = nicknameKeyboard.text ?? "";
-
-        if (keyboardText.Length > NicknameCharacterLimit)
-        {
-            keyboardText = keyboardText.Substring(0, NicknameCharacterLimit);
-        }
-
-        ApplyNicknameTextToField(keyboardText);
-
-        if (nicknameKeyboard.status == TouchScreenKeyboard.Status.Done ||
-            nicknameKeyboard.status == TouchScreenKeyboard.Status.Canceled ||
-            nicknameKeyboard.status == TouchScreenKeyboard.Status.LostFocus)
-        {
-            isNicknameKeyboardOpen = false;
-            nicknameKeyboard = null;
-            ReleaseNicknameInputFocus();
-        }
-    }
-
-    private void CloseNativeNicknameKeyboard()
-    {
-        if (nicknameKeyboard != null)
-        {
-            nicknameKeyboard.active = false;
-            nicknameKeyboard = null;
-        }
-
-        isNicknameKeyboardOpen = false;
-    }
-#endif
-
-    private void ApplyNicknameTextToField(string nickname)
+    private void MoveNicknameCaretToEnd()
     {
         if (nicknameInput == null)
             return;
 
-        nicknameInput.SetTextWithoutNotify(nickname);
+        string text = nicknameInput.text ?? "";
+        int endPosition = text.Length;
+
+   
+        nicknameInput.caretPosition = endPosition;
+        nicknameInput.stringPosition = endPosition;
+
+        nicknameInput.selectionAnchorPosition = endPosition;
+        nicknameInput.selectionFocusPosition = endPosition;
+
+        nicknameInput.selectionStringAnchorPosition = endPosition;
+        nicknameInput.selectionStringFocusPosition = endPosition;
+
         nicknameInput.ForceLabelUpdate();
     }
 
@@ -299,14 +225,6 @@ public class ProfilePopupController : MonoBehaviour
 
     public void SaveProfile()
     {
-#if UNITY_ANDROID || UNITY_IOS
-        if (isNicknameKeyboardOpen && nicknameKeyboard != null)
-        {
-            ApplyNicknameTextToField(nicknameKeyboard.text ?? "");
-            CloseNativeNicknameKeyboard();
-        }
-#endif
-
         string nickname = nicknameInput != null ? nicknameInput.text.Trim() : "";
 
         if (string.IsNullOrEmpty(nickname))
@@ -314,12 +232,21 @@ public class ProfilePopupController : MonoBehaviour
             nickname = DefaultNickname;
         }
 
+        if (nickname.Length > NicknameCharacterLimit)
+        {
+            nickname = nickname.Substring(0, NicknameCharacterLimit);
+        }
+
         PlayerPrefs.SetString(NicknameKey, nickname);
         PlayerPrefs.SetInt(AvatarIndexKey, selectedAvatarIndex);
         PlayerPrefs.Save();
 
-        ApplyNicknameTextToField(nickname);
-        ReleaseNicknameInputFocus();
+        if (nicknameInput != null)
+        {
+            nicknameInput.SetTextWithoutNotify(nickname);
+            nicknameInput.ForceLabelUpdate();
+            MoveNicknameCaretToEnd();
+        }
 
         Debug.Log($"[ProfilePopupController] Saved profile. Nickname: {nickname}, Avatar: {selectedAvatarIndex}");
     }
@@ -328,7 +255,11 @@ public class ProfilePopupController : MonoBehaviour
     {
         string nickname = PlayerPrefs.GetString(NicknameKey, "");
 
-        ApplyNicknameTextToField(nickname);
+        if (nicknameInput != null)
+        {
+            nicknameInput.SetTextWithoutNotify(nickname);
+            nicknameInput.ForceLabelUpdate();
+        }
 
         int maxAvatarIndex = avatarButtons != null && avatarButtons.Length > 0
             ? avatarButtons.Length - 1
@@ -345,6 +276,8 @@ public class ProfilePopupController : MonoBehaviour
                 selectedAvatarImage.sprite = avatarSprite;
             }
         }
+
+        MoveNicknameCaretToEnd();
     }
 
     public Sprite GetAvatarSpriteByIndex(int avatarIndex)
